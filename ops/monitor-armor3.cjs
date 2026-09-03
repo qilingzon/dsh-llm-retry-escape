@@ -18,7 +18,9 @@ const LOG = process.argv[4] || path.join(__dirname, "monitor.log");
 const SNAP_DIR = process.env.MONITOR_SNAPSHOT_DIR || "";   // 可选：落盘进度快照目录
 const POLL_MS = 20000;
 const MAX_MINUTES = 240;
-const START = Date.now();
+const STATE = process.argv[5] || (process.argv[4] ? process.argv[4] + ".state" : path.join(__dirname, "monitor.state.json"));
+// STATE file: remembers the last reported storm so relaunches skip it
+// STATE file: remembers the last reported storm so relaunches skip it
 const fmt = (ms) => new Date(ms).toLocaleTimeString("zh-CN", { hour12: false });
 
 function log(line) { fs.appendFileSync(LOG, `[${fmt(Date.now())}] ${line}\n`); }
@@ -67,6 +69,9 @@ function diskSnapshot() {
 }
 
 let lastSeq = -1;
+let lastReported = null;
+try { lastReported = JSON.parse(fs.readFileSync(STATE, "utf8")); } catch {}
+// STATE file: remembers the last reported storm so relaunches skip it
 let ledgerSeen = 0;
 let activeStorm = null; // {key, turn, step, firstFail, fails, lastFail}
 log(`monitor start: root=${ROOT}; horizon=${MAX_MINUTES}min; poll=${POLL_MS}ms`);
@@ -112,8 +117,10 @@ while (Date.now() - START < MAX_MINUTES * 60000) {
           const resolved = ledger.filter((l) => l.phenomenon === "retry-resolved" && String(l.detail).includes(`turn${activeStorm.turn}/step${activeStorm.step}`) && new Date(l.ts).getTime() > activeStorm.firstFail - 86400000);
           log(`BATTLE-WON: turn${activeStorm.turn}/step${activeStorm.step} recovered @${fmt(after[0].time)} (${after[0].type}); fails=${activeStorm.fails} storm=${dur}s; ledger-resolved-record=${resolved.length > 0 ? "YES" : "pending(next pre-step)"}`);
           if (activeStorm.fails >= 2) {
+            if (lastReported && lastReported.key === activeStorm.key && lastReported.lastFail === activeStorm.lastFail) { activeStorm = null; }
+            else { try { fs.writeFileSync(STATE, JSON.stringify({ key: activeStorm.key, lastFail: activeStorm.lastFail })); } catch {}
             log("MONITOR-EXIT: battle-won");
-            process.exit(0);
+            process.exit(0); }
           }
           activeStorm = null;   // 单败小嗝：记账后继续值守
         }
