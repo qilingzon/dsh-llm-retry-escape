@@ -23,7 +23,7 @@ const STATE = process.argv[5] || (process.argv[4] ? process.argv[4] + ".state" :
 // STATE file: remembers the last reported storm so relaunches skip it
 const fmt = (ms) => new Date(ms).toLocaleTimeString("zh-CN", { hour12: false });
 
-function log(line) { fs.appendFileSync(LOG, `[${fmt(Date.now())}] ${line}\n`); }
+function log(line) { try { fs.appendFileSync(LOG, `[${fmt(Date.now())}] ${line}\n`); } catch { /* 日志失败永不影响监视 */ } }
 
 // sessions/<workspace>/<session-uuid>/session.jsonl.zstd —— 取最近写入者
 function newestSession() {
