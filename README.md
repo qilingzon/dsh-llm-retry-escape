@@ -46,21 +46,38 @@ normal 重试策略模式与内置实现逐字一致（不记账、不注入）�
 
 ## 安装
 
-要求：DSH Desktop（cordis 插件体系）。
+要求：Windows + DSH Desktop（cordis 插件体系）。安装器会同时写入两个必需目标（Host 插件源 + profile 挂载点），并做 SHA256 双点校验。
+
+### 方式一：一行网络安装（推荐）
 
 ```powershell
-# 1) 克隆
-git clone https://github.com/qilingzon/dsh-llm-retry-escape.git
-# 2) 复制到 DSH 插件目录（Windows 示例，$env:USERPROFILE\.dsh 下）
-Copy-Item dsh-llm-retry-escape\* $env:USERPROFILE\.dsh\plugins\dsh-llm-retry-escape\ -Recurse -Force
-# 3) 同步到 profile 实装点（desktop profile 示例）
-Copy-Item dsh-llm-retry-escape\* $env:USERPROFILE\.dsh\profiles\desktop\node_modules\dsh-llm-retry-escape\ -Recurse -Force
-# 4) 重启 DSH Desktop（插件与配置均启动时读取）
-# 5) 验证：设置 → 反卡死历史 面板出现；或 dsh --dump-config 确认 llm-retry disabled + 本插件在列
+irm https://raw.githubusercontent.com/qilingzon/dsh-llm-retry-escape/main/install.ps1 | iex
 ```
 
-`cordis.patch.yml` 两行捆绑：停用内置 `llm-retry` + 挂载本插件。卸载本 bundle 即自动还原内置，原子回滚。
+### 方式二：本地克隆安装
 
+```powershell
+git clone https://github.com/qilingzon/dsh-llm-retry-escape.git
+cd dsh-llm-retry-escape
+.\install.ps1                      # 可选参数: -Profile desktop -DshHome "$env:USERPROFILE\.dsh" -Source <本地目录>
+```
+
+### 方式三：dsh:// 一键协议安装（DSH 内置安装器）
+
+```text
+dsh://plugin/install?id=dsh-llm-retry-escape&name=%E5%8F%8D%E5%8D%A1%E6%AD%BB%E5%8D%AB%E5%A3%AB&version=0.3.4&repo=qilingzon/dsh-llm-retry-escape&permissions=%E6%8E%A5%E7%AE%A1%20agent%2Frequest-error%20%E6%81%A2%E5%A4%8D%EF%BC%9B%E4%BC%9A%E8%AF%9D%E5%B7%A5%E4%BD%9C%E5%8C%BA%E6%8C%87%E7%BA%B9%E7%9B%91%E6%B5%8B%EF%BC%9Bapi%2Fdsh-llm-retry-escape%2F*%20loopback%20%E8%B7%AF%E7%94%B1%EF%BC%9B%E8%AE%BE%E7%BD%AE%E9%A1%B5%E6%A8%A1%E6%9D%BF&downloadUrl=https%3A%2F%2Fgithub.com%2Fqilingzon%2Fdsh-llm-retry-escape%2Farchive%2Frefs%2Fheads%2Fmain.zip
+```
+
+### 安装后验证（分端）
+
+| 端 | 验证方式 |
+|---|---|
+| **桌面端**（Electron app） | 重启 DSH Desktop → 设置 → 插件清单出现 `dsh-llm-retry-escape`（内置 llm-retry 显示 disabled）；会话内插件自动接管请求失败（账本出现记录即证明） |
+| **Web 端**（浏览器，同一 Host） | 设置 → 「反卡死历史」面板渲染账本记录（client.js 由 Host 直接向 web 前端供给，无需单独安装）；面板 5s 自动刷新 |
+
+> 桌面端与 Web 端共享同一 Host 与同一份安装文件——install.ps1 双目标写入 + 双点校验就是为了保证两端拿到的是同一份字节。卸载：`.\uninstall.ps1`（bundle 补丁随目录移除，内置 llm-retry 自动原子还原）。
+
+`cordis.patch.yml` 两行捆绑：停用内置 `llm-retry` + 挂载本插件。
 ## 环境变量（Host 启动时读一次，改后需重启）
 
 | 变量 | 默认 | 含义 |
