@@ -5,7 +5,7 @@
 ## 0. 背景
 
 - 环境：DSH Desktop（desktop profile），provider 为中继 `jiyuanliudon`（openai-completions 兼容），模型 max 推力，任务上下文 99K+ tok。
-- 被监护任务：armor-lab 工作区的 gen4 插件构建（目标：5 核心文件全量落盘），13:56 创建 goal。
+- 被监护任务：某插件构建目标（要求 5 个核心文件全量落盘），13:56 创建 goal。被监护对象细节已脱敏——本仓库与该目标项目无代码关联。
 - 当日中继状态恶劣：`TRANSPORT terminated`（掐流）、`SERVER 503/504`、`TIMEOUT`（流停滞 + 整请求超时）轮番出现。
 
 ## 1. 修复前基线（13:56–18:53）
@@ -37,7 +37,7 @@
 
 - turn12/step1、turn13/step1 两场风暴后，策略卡（`retry-strategy`）真机注入，用户在对话中直接可见。
 - turn13 五连败全为 "Request timed out."（间隔 92s）→ 分诊出第三种死法：**timeoutMs 90s 天花板杀思考期**——配置病，`timeoutMs → 600000`（19:17 重启生效）。
-- **终局验证**（19:17–19:51，turn9）：**75 步推进、仅 1 败**；gen4 目标 7 个文件全部落盘（cordis.patch.yml 19:19 → package.json 19:19 → client.js 19:21 → index.js 19:32 分段追加至 16.4KB → 主提示词 19:42 落盘 23.3KB，超 gen3 参考件体量）；install.sh / uninstall.sh / LICENSE 亦随后落盘。
+- **终局验证**（19:17–19:51，turn9）：**75 步推进、仅 1 败**；目标 7 个文件全部落盘（cordis.patch.yml 19:19 → package.json 19:19 → client.js 19:21 → index.js 19:32 分段追加至 16.4KB → 主提示词 19:42 落盘 23.3KB，超 gen3 参考件体量）；install.sh / uninstall.sh / LICENSE 亦随后落盘。
 - 策略行为可见：index.js 以 3.4K→4.6K→8.2K→16.4K 分段编辑增长——模型确实切换到了"骨架 + 分段追加"形状。
 
 ### 2.4 双工作区覆盖
