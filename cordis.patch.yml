@@ -1,0 +1,12 @@
+# dsh-llm-retry-escape bundle patch：
+# 1) 停用内置 llm-retry 行（name 断言防止 id 被中间层改绑后误停别的插件）
+# 2) 挂载本插件作为唯一重试实现
+# 两个动作捆绑在同一文件：卸载本 bundle 时自动还原内置 llm-retry，原子生效/回滚。
+
+- id: llm-retry
+  name: '@deepseek-ai/dsh-llm-retry'
+  disabled: true
+
+- insert:
+    - id: llm-retry-escape
+      name: dsh-llm-retry-escape
