@@ -118,7 +118,7 @@ while (Date.now() - START < MAX_MINUTES * 60000) {
           activeStorm = null;   // 单败小嗝：记账后继续值守
         }
         // 解决判定 B：逃生阀触发（turn 结束 + 账本 deadloop）
-        const turnEnd = [...ev].reverse().find((e) => e.type === "turn/end" && (e.data?.turn === activeStorm.turn || e.data?.turn === undefined));
+        const turnEnd = activeStorm ? [...ev].reverse().find((e) => e.type === "turn/end" && (e.data?.turn === activeStorm.turn || e.data?.turn === undefined)) : null;
         if (turnEnd && turnEnd.time > activeStorm.lastFail && activeStorm.fails >= 5) {
           const dead = ledger.filter((l) => l.phenomenon === "deadloop" && String(l.detail).includes(`turn${activeStorm.turn}`));
           log(`VALVE-FIRED: turn${activeStorm.turn} ended @${fmt(turnEnd.time)} after ${activeStorm.fails} fails (${Math.round((turnEnd.time - activeStorm.firstFail) / 1000)}s); deadloop-record=${dead.length ? dead[dead.length - 1].detail : "MISSING!"}`);
