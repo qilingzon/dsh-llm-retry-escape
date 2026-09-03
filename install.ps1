@@ -92,3 +92,6 @@ Write-Host "  3. Optional env (set BEFORE Host start):"
 Write-Host "       DSH_RETRY_ESCAPE_AFTER=5      (escape valve threshold, default 30)"
 Write-Host "       DSH_RETRY_STRATEGY_AFTER=2    (strategy injection threshold)"
 Write-Host "  4. Uninstall: run uninstall.ps1 from the repo (built-in llm-retry auto-restores)."
+
+# cleanup temp download dir
+if ($tmp -and (Test-Path $tmp)) { Remove-Item $tmp -Recurse -Force -ErrorAction SilentlyContinue }
