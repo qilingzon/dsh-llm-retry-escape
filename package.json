@@ -1,6 +1,6 @@
 {
   "name": "dsh-llm-retry-escape",
-  "version": "0.3.4",
+  "version": "0.3.5",
   "description": "反卡死插件：重试逃生阀 + 磁盘进度哨兵 + 负进度校验门 + 洞察账本与设置页历史面板（五种病理全监测）",
   "type": "module",
   "main": "index.js",
@@ -22,7 +22,7 @@
   "dsh": {
     "id": "dsh-llm-retry-escape",
     "name": "反卡死卫士",
-    "version": "0.3.4",
+    "version": "0.3.5",
     "permissions": "接管 agent/request-error 恢复；会话工作区指纹监测；api/dsh-llm-retry-escape/* loopback 路由；设置页模板",
     "client": {
       "platform": "web",

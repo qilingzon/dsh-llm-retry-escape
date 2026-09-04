@@ -1,5 +1,15 @@
 # 更新日志 — dsh-llm-retry-escape
 
+## 0.3.5（2026-09-03）
+
+三项实战驱动改进：
+
+1. **config-disease 自动诊断**：同一步 "Request timed out." 同码连败且失败间隔≈常数（中位 ≥ `DSH_CONFIG_DISEASE_MIN_MS`，极差 <40%）→ 账本记 ⚙️ `config-disease`，直接给出 settings.yaml 的 timeoutMs 调整建议——把人工分诊自动化（实证：turn13 五连败 92s 间隔的天花板病，当时靠人工分析才定位）。
+2. **策略注入按失败码自适应**：RATE_LIMIT-only → 限流节奏话术（不再误说输出体积）；SERVER/INVALID_REQUEST → 网关不稳话术；TRANSPORT/TIMEOUT → 生成形状话术（原有）。实证动机：turn27/step1 五连败全是 429，静态文本还在教"改输出体积"——诊断错了病。
+3. **B 哨兵只认写入类工具**：纯读取/检索/清单类工具（read/grep/web_search 等）不再计入干活证据——修纯分析轮误报（当晚在监测会话自身实弹误报）。bash/pwsh 等可写工具仍计入。
+
+新增 `tests/test_v035.mjs`（8 条）。
+
 ## 0.3.4（2026-09-03）
 
 **A1-Coach 失败步策略注入**：同一 `(turn, step)` 连败 ≥2（`DSH_RETRY_STRATEGY_AFTER` 可调）→ 下一轮 pre-step 注入 `retry-strategy` 策略消息：单次工具调用参数 ≤1500 字符 / 大文件骨架 + 分段追加 / 禁单次巨型生成 / 内容只进工具参数。

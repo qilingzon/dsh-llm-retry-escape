@@ -18,6 +18,7 @@ const LOG = process.argv[4] || path.join(__dirname, "monitor.log");
 const SNAP_DIR = process.env.MONITOR_SNAPSHOT_DIR || "";   // 可选：落盘进度快照目录
 const POLL_MS = 20000;
 const MAX_MINUTES = 240;
+const START = Date.now();
 const STATE = process.argv[5] || (process.argv[4] ? process.argv[4] + ".state" : path.join(__dirname, "monitor.state.json"));
 // STATE file: remembers the last reported storm so relaunches skip it
 // STATE file: remembers the last reported storm so relaunches skip it

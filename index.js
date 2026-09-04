@@ -69,6 +69,16 @@ const ESCAPE_AFTER = (() => {
 })();
 const ESCALATE_MAX_DELAY_MS = 5000;
 
+// v0.3.5：config-disease 诊断的间隔下限（中位失败间隔低于此值不判配置病；测试可调小）
+const CONFIG_DISEASE_MIN_MS = (() => {
+	const n = Number(process.env.DSH_CONFIG_DISEASE_MIN_MS);
+	return Number.isFinite(n) && n >= 0 ? n : 20000;
+})();
+
+// v0.3.5：B 哨兵只认"可能落盘"的工具——纯读取/检索/清单类工具不构成干活证据（降误报）。
+// bash/pwsh 等可写工具仍计入（保守：指纹本身就是最终裁判）。
+const READ_ONLY_TOOL_RE = /read|glob|grep|search|fetch|todo|view|open|list|web|ask|skill|think|goal|plan/i;
+
 // v0.3.4：同一 (turn, step) 连败多少次后，下一轮注入「改变生成形状」策略（0 = 关闭）
 const STRATEGY_AFTER = (() => {
 	const raw = process.env.DSH_RETRY_STRATEGY_AFTER;
@@ -312,10 +322,35 @@ function progressWarnN(streak) {
 	);
 }
 
-// v0.3.4：失败步策略注入文本——把「换新请求」从口号变成可执行的生成形状指令
+// v0.3.4/v0.3.5：失败步策略注入文本——按失败码自适应话术（把「换新请求」变成对症指令）
 function strategyWarnText(count, codes, turn, step) {
+	const c = codes.join("/");
+	const has = (x) => codes.includes(x);
+	const rateOnly = codes.length === 1 && has("RATE_LIMIT");
+	const serverish = !has("TRANSPORT") && !has("TIMEOUT") && (has("SERVER") || has("INVALID_REQUEST"));
+	if (rateOnly) {
+		// 限流/配额类：输出体积无罪，节奏才有罪
+		return (
+			`[retry-strategy] 上一轮的 turn${turn}/step${step} 已连续失败 ${count} 次（${c}）——全部是限流/配额类失败，不是你的输出问题。本轮调整节奏而非内容：` +
+			"1) 串行小步执行，禁止并行大批量工具调用；" +
+			"2) 步与步之间留出间隔，避免密集请求；" +
+			"3) 不要用加大请求体积的方式「挽回时间」；" +
+			"4) 若继续连败 429，说明中继配额窗口未恢复——把当前进展写入 progress.md 稍作等待再继续，必要时告知用户考虑切换 provider。"
+		);
+	}
+	if (serverish) {
+		// 网关/上游不稳（5xx/400）：内容无罪，小步快走 + 别硬冲
+		return (
+			`[retry-strategy] 上一轮的 turn${turn}/step${step} 已连续失败 ${count} 次（${c}）——中继网关/上游不稳定。本轮：` +
+			"1) 保持小步快走，单次工具调用 ≤1500 字符，失败原样重试不必改写内容；" +
+			"2) 每步落盘验证后再走下一步；" +
+			"3) 避免一次性大请求（网关对长请求更脆弱）；" +
+			"4) 连续 502/504 时等待数秒再试，不要连续硬冲。"
+		);
+	}
+	// 掐流/停滞类（TRANSPORT/TIMEOUT）：生成形状是主因
 	return (
-		`[retry-strategy] 上一轮的 turn${turn}/step${step} 已连续失败 ${count} 次（${codes.join("/")}）——流式生成在传输层被反复掐断。` +
+		`[retry-strategy] 上一轮的 turn${turn}/step${step} 已连续失败 ${count} 次（${c}）——流式生成在传输层被反复掐断。` +
 		"重发同样的请求只会同样死掉：失败的直接原因是单次生成的输出体积太大、时长超出中继存活窗口。本轮必须改变生成形状：" +
 		"1) 单次工具调用参数 ≤1500 字符；" +
 		"2) 大文件先写最小骨架（几十行占位），再用多次编辑/追加每次只补 1-2 段，写一段验证一段；" +
@@ -380,12 +415,36 @@ export function apply(ctx) {
 				resolved: "已安排重试",
 				lesson: "发现本身要可见——失败不是静默的",
 			});
-			// A1-Coach(v0.3.4)：记录连败风暴（每次失败都更新；阈值在消费端判——首败的失败码也要进账）
+			// A1-Coach(v0.3.4/v0.3.5)：记录连败风暴（每次失败都更新；阈值在消费端判——首败的失败码也要进账）
+			// times[]：失败时刻序列，供 config-disease 诊断（同码连败 + 间隔≈常数 = 配置病）
 			const prev = strategyPending.get(agent.id);
 			const sameStep = prev && prev.turn === turn && prev.step === step;
 			const codes = sameStep ? prev.codes : [];
 			if (!codes.includes(failure?.code || "?")) codes.push(failure?.code || "?");
-			strategyPending.set(agent.id, { turn, step, count: retry, codes });
+			const times = sameStep && Array.isArray(prev.times) ? prev.times : [];
+			times.push(Date.now());
+			const recStorm = { turn, step, count: retry, codes, times, configLogged: sameStep ? prev.configLogged : false };
+			strategyPending.set(agent.id, recStorm);
+			// v0.3.5：config-disease 自动诊断——"Request timed out." 同码连败且失败间隔≈常数
+			// → 活请求被整请求超时上限当死请求杀，属配置病（插件治不了，账本报给用户调 settings）
+			if (times.length >= 3 && /request timed out/i.test(String(failure?.message || ""))) {
+				const gaps = times.slice(1).map((t, i) => t - times[i]);
+				const sorted = [...gaps].sort((a, b) => a - b);
+				const med = sorted[Math.floor(sorted.length / 2)];
+				const spread = Math.max(...gaps) - Math.min(...gaps);
+				if (med >= CONFIG_DISEASE_MIN_MS && spread < med * 0.4 && !recStorm.configLogged) {
+					recStorm.configLogged = true;
+					appendInsight({
+						source: "plugin",
+						session: agent.session?.header?.id || "",
+						workspace: agent.session?.header?.cwd || "",
+						phenomenon: "config-disease",
+						detail: `turn${turn}/step${step} "Request timed out." 同码连败且间隔恒定（中位 ${Math.round(med / 1000)}s，极差 ${Math.round(spread / 1000)}s）——疑似 provider timeoutMs 过小：max 推力的思考期被整请求上限当死请求杀`,
+						resolved: "已记配置病诊断（请调大 settings.yaml 的 provider timeoutMs，建议 ≥ 中位间隔×2）",
+						lesson: "配置病和代码病分开治——插件报警，settings 治病",
+					});
+				}
+			}
 		}
 		if (!await cancellableDelay(delayMs, fusedSignal)) return;
 		agent.session.append("llm/retry-started", {
@@ -497,7 +556,9 @@ export function apply(ctx) {
 			const sid = exec?.agent?.session?.header?.id;
 			if (sid) {
 				const st = progressState.get(sid);
-				if (st) st.sawTools = true;   // 本轮有工具活动 = 在"干活"
+				// v0.3.5：只认"可能落盘"的工具——纯读取/检索类不计入干活证据（修纯分析轮误报）
+				const toolName = String(exec?.name || "");
+				if (st && !READ_ONLY_TOOL_RE.test(toolName)) st.sawTools = true;
 			}
 		} catch {
 			// 忽略

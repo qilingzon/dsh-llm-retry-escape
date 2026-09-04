@@ -30,6 +30,7 @@ window.__ModuleLoader__.load({
       "retry-resolved": "✅ 重试成功·已解决",
       "relay-rearmed": "🔁 阀后自动接力",
       "strategy-injected": "📜 连败策略注入",
+      "config-disease": "⚙️ 配置病诊断",
       "unparsable": "无法解析的记录"
     };
     var PHEN_COLOR = {
@@ -47,6 +48,7 @@ window.__ModuleLoader__.load({
       "retry-resolved": "#22c55e",
       "relay-rearmed": "#06b6d4",
       "strategy-injected": "#8b5cf6",
+      "config-disease": "#f97316",
       "unparsable": "#9ca3af"
     };
 

@@ -65,7 +65,7 @@ cd dsh-llm-retry-escape
 ### 方式三：dsh:// 一键协议安装（DSH 内置安装器）
 
 ```text
-dsh://plugin/install?id=dsh-llm-retry-escape&name=%E5%8F%8D%E5%8D%A1%E6%AD%BB%E5%8D%AB%E5%A3%AB&version=0.3.4&repo=qilingzon/dsh-llm-retry-escape&permissions=%E6%8E%A5%E7%AE%A1%20agent%2Frequest-error%20%E6%81%A2%E5%A4%8D%EF%BC%9B%E4%BC%9A%E8%AF%9D%E5%B7%A5%E4%BD%9C%E5%8C%BA%E6%8C%87%E7%BA%B9%E7%9B%91%E6%B5%8B%EF%BC%9Bapi%2Fdsh-llm-retry-escape%2F*%20loopback%20%E8%B7%AF%E7%94%B1%EF%BC%9B%E8%AE%BE%E7%BD%AE%E9%A1%B5%E6%A8%A1%E6%9D%BF&downloadUrl=https%3A%2F%2Fgithub.com%2Fqilingzon%2Fdsh-llm-retry-escape%2Farchive%2Frefs%2Fheads%2Fmain.zip
+dsh://plugin/install?id=dsh-llm-retry-escape&name=%E5%8F%8D%E5%8D%A1%E6%AD%BB%E5%8D%AB%E5%A3%AB&version=0.3.5&repo=qilingzon/dsh-llm-retry-escape&permissions=%E6%8E%A5%E7%AE%A1%20agent%2Frequest-error%20%E6%81%A2%E5%A4%8D%EF%BC%9B%E4%BC%9A%E8%AF%9D%E5%B7%A5%E4%BD%9C%E5%8C%BA%E6%8C%87%E7%BA%B9%E7%9B%91%E6%B5%8B%EF%BC%9Bapi%2Fdsh-llm-retry-escape%2F*%20loopback%20%E8%B7%AF%E7%94%B1%EF%BC%9B%E8%AE%BE%E7%BD%AE%E9%A1%B5%E6%A8%A1%E6%9D%BF&downloadUrl=https%3A%2F%2Fgithub.com%2Fqilingzon%2Fdsh-llm-retry-escape%2Farchive%2Frefs%2Fheads%2Fmain.zip
 ```
 
 ### 安装后验证（分端）
@@ -88,6 +88,7 @@ dsh://plugin/install?id=dsh-llm-retry-escape&name=%E5%8F%8D%E5%8D%A1%E6%AD%BB%E5
 | `DSH_PROGRESS_EXCLUDES` | `node_modules,.git,.venv,venv,__pycache__` | 指纹排除目录 |
 | `DSH_PROGRESS_CHECK_CMD` | 未设（关） | 功能 D 校验命令（cwd=工作区，退出码 0=通过） |
 | `DSH_PROGRESS_CHECK_TIMEOUT_MS` | `120000` | 校验超时 |
+| `DSH_CONFIG_DISEASE_MIN_MS` | `20000` | config-disease 诊断的间隔下限（测试可调小） |
 
 配套 Host 配置建议（settings.yaml，provider 级）：`timeoutMs` 必须容纳 max 推力的思考期（实测 90s 会把活请求当死请求杀，推荐 600000）；`streamIdleTimeoutMs: 120000` 保持不变，死流 2 分钟内照死。
 
