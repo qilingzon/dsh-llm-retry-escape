@@ -1,5 +1,15 @@
 # 更新日志 — dsh-llm-retry-escape
 
+## 0.3.7（2026-09-04）
+
+**账本治理三件套**（动机：账本两天 754 条 / 263KB，81% 为 retry-detected/resolved 高频条目，无界增长先痛面板 5s 全量轮询）：
+
+1. **/insights limit 截断**：默认返回最近 500 条（`?limit=N` 可调），响应新增 `total`/`limit`；面板 headline 显示「最近 N / 共 M 条」——面板体量与账本体量解耦。
+2. **账本大小轮转**：现有文件 + 本条将超 `DSH_RETRY_LEDGER_MAX_BYTES`（默认 5MB，0=关闭，动态读 env）→ 改名归档 `retry-insights-archive-<时间戳>.jsonl` 后续写；归档失败不阻塞记账。
+3. **monitor-multi 日志 7 天保留**：启动时清理自身过期 `monitor-multi-*.log`；`DSH_MONITOR_LOG_DIR` 可覆写目录。
+
+新增 `tests/test_v036b_housekeeping.mjs`（4 条：limit=2 截断 / 默认 500 / 轮转归档 / 日志保留子进程实测）。
+
 ## 0.3.6（2026-09-04）
 
 **A1-Coach 升级阶梯**：策略注入不再原地重复——注入后风暴仍在（下一轮入口仍有待注入记录）→ 阶梯 +1，

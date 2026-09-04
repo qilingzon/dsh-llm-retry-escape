@@ -61,7 +61,7 @@
  */
 
 import { randomUUID } from "node:crypto";
-import { promises as fsp, appendFileSync, existsSync, readFileSync } from "node:fs";
+import { promises as fsp, appendFileSync, existsSync, readFileSync, statSync, renameSync } from "node:fs";
 import { exec } from "node:child_process";
 import { homedir } from "node:os";
 import { join as pathJoin } from "node:path";
@@ -143,9 +143,30 @@ function insightsPath() {
 		? pathJoin(process.env.DSH_HOME, "retry-insights.jsonl")
 		: pathJoin(homedir(), ".dsh", "retry-insights.jsonl");
 }
+// v0.3.7：账本大小轮转——现有文件 + 本条将超上限（DSH_RETRY_LEDGER_MAX_BYTES，默认 5MB，0=关闭）
+// 时，先把现文件改名归档（时间戳后缀），再从头追加。动态读 env（与 insightsPath 同语义，测试可调）。
+// 归档失败（Windows 文件被占用等）不阻塞记账：跳过本轮轮转照常追加。
+function ledgerMaxBytes() {
+	const n = Number(process.env.DSH_RETRY_LEDGER_MAX_BYTES);
+	return Number.isFinite(n) && n >= 0 ? Math.floor(n) : 5 * 1024 * 1024;
+}
+function rotateLedgerIfNeeded(file, incomingBytes) {
+	const max = ledgerMaxBytes();
+	if (max <= 0 || !existsSync(file)) return;
+	try {
+		if (statSync(file).size + incomingBytes <= max) return;
+		const archive = file.replace(/\.jsonl$/, "") + "-archive-" + new Date().toISOString().replace(/[:.]/g, "-") + ".jsonl";
+		renameSync(file, archive);
+	} catch {
+		// 归档失败照常追加（顶多超限一点，下轮再试）
+	}
+}
 function appendInsight(record) {
 	try {
-		appendFileSync(insightsPath(), JSON.stringify({ ts: new Date().toISOString(), ...record }) + "\n");
+		const file = insightsPath();
+		const line = JSON.stringify({ ts: new Date().toISOString(), ...record }) + "\n";
+		rotateLedgerIfNeeded(file, line.length);
+		appendFileSync(file, line);
 	} catch {
 		// 账本永不破坏主循环
 	}
@@ -182,7 +203,18 @@ function makeInsightsRoute() {
 			} catch {
 				// 读失败返回空
 			}
-			writeJson(res, 200, { ok: true, count: records.length, records });
+			// v0.3.7：limit 截断——默认返回最近 500 条，?limit=N 可调；total 为账本总条数。
+			// 面板体量与账本体量解耦：账本涨到几十 MB 时面板每次只传最近窗口。
+			const total = records.length;
+			let limit = 500;
+			try {
+				const m = String(req.url || "").match(/[?&]limit=(\d{1,6})(?:&|$)/);
+				if (m) limit = Math.max(1, Math.min(Number(m[1]), 1000000));
+			} catch {
+				// 解析失败用默认值
+			}
+			records = records.slice(0, limit);
+			writeJson(res, 200, { ok: true, count: records.length, total, limit, records });
 		},
 	};
 }

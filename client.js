@@ -117,7 +117,7 @@ window.__ModuleLoader__.load({
       var headline = react.createElement("div", { style: { marginBottom: "8px", display: "flex", alignItems: "baseline", gap: "10px", flexWrap: "wrap" } },
         react.createElement("span", { style: { fontWeight: 600 } }, "五种病理监测历史"),
         react.createElement("span", { style: { fontSize: "11px", color: "var(--dsw-alias-label-secondary, #888)" } },
-          "死循环 / 活锁 / 伪进度 / 负进度 / 静默腐蚀 · 共 " + records.length + " 条 · 5s 自动刷新"),
+          "死循环 / 活锁 / 伪进度 / 负进度 / 静默腐蚀 · " + (typeof data.total === "number" && data.total > records.length ? "最近 " + records.length + " / 共 " + data.total + " 条" : "共 " + records.length + " 条") + " · 5s 自动刷新"),
         errorText ? react.createElement("span", { style: { fontSize: "11px", color: "#ef4444" } }, "读取失败：" + errorText) : null
       );
 
