@@ -53,7 +53,7 @@ function ledgerLines() {
 let ledgerSeen = ledgerLines().length;   // 启动基线：历史记录不再重放，只记增量（防重启刷屏）
 const stateMap = {};   // tag -> {key, lastFail} 已报告风暴，重启后跳过
 try { Object.assign(stateMap, JSON.parse(fs.readFileSync(STATE_FILE, "utf8"))); } catch {}
-const watchers = ROOTS.map((root) => ({ root, tag: TAG(root), lastSeq: -1, storm: null, relayWait: null }));
+const watchers = ROOTS.map((root) => ({ root, tag: TAG(root), lastSeq: -1, storm: null, relayWait: null, lastResolved: null }));
 function exitReport(code) { try { fs.writeFileSync(STATE_FILE, JSON.stringify(stateMap)); } catch {} process.exit(code); }
 log("monitor-multi start: roots=[" + watchers.map((w) => w.tag).join(", ") + "], ledger baseline=" + ledgerSeen + ", horizon " + MAX_MIN + "min, poll " + POLL_MS + "ms");
 
@@ -94,6 +94,8 @@ function watchOne(w) {
     return false;
   }
   const key = lastR.data.turn + "/" + lastR.data.step;
+  // 已解决的风暴不因新事件到达而重报（最后 retry 事件在 10 分钟窗口内保持不变，防止刷屏）
+  if (!w.storm && w.lastResolved && w.lastResolved.key === key && w.lastResolved.lastFail === lastR.time) return false;
   if (!w.storm || w.storm.key !== key) {
     const first = retries.find((r) => r.data.turn + "/" + r.data.step === key);
     w.storm = { key, turn: lastR.data.turn, step: lastR.data.step, firstFail: first.time, fails: retries.filter((r) => r.data.turn + "/" + r.data.step === key).length, lastFail: lastR.time };
@@ -113,10 +115,12 @@ function watchOne(w) {
       const rep = stateMap[w.tag];
       if (!(rep && rep.key === w.storm.key && rep.lastFail === w.storm.lastFail)) {
         stateMap[w.tag] = { key: w.storm.key, lastFail: w.storm.lastFail };
+        w.lastResolved = { key: w.storm.key, lastFail: w.storm.lastFail };
         w.storm = null;
         return "battle-won";
       }
     }
+    w.lastResolved = { key: w.storm.key, lastFail: w.storm.lastFail };
     w.storm = null;   // 单败小嗝：记账后继续值守
     return false;
   }
