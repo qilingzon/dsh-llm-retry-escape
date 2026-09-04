@@ -1,5 +1,19 @@
 # 更新日志 — dsh-llm-retry-escape
 
+## 0.3.6（2026-09-04）
+
+**A1-Coach 升级阶梯**：策略注入不再原地重复——注入后风暴仍在（下一轮入口仍有待注入记录）→ 阶梯 +1，
+第 2 级起改发「拆任务」升级话术（拆 ≥3 小步写 progress.md / 本轮只做第一小步 / 缩减版骨架 / blocked 换路径），
+新账本现象 `strategy-escalated`；风暴痊愈（某轮入口无待注入记录）→ 复位 L1。
+新增 `DSH_RETRY_STRATEGY_MAX_LEVEL`（默认 2；1=永不升级即 0.3.5 行为；0=关闭整个策略注入）。
+
+- 设计要点：**阶梯键=agentId**——turn 每轮递增，按 (turn,step) 匹配永远升不了级。
+- 同版附带：client 面板统计卡（反卡死历史顶部按现象聚合的色点计数条，未知现象兜底显示）。
+- 新增 `tests/test_v036_ladder.mjs`（4 条：L1→L2 升级 / 封顶 / 痊愈复位 / MAX_LEVEL=0 关闭）与
+  `tests/test_goal_e2e.ps1`（goal 全周期真实链路 E2E，5 条：headless 型 profile + create_goal + 磁盘判据）。
+- 新增 `ops/monitor-multi.cjs`：多会话聚合监视器（多 ROOT 并盯、每根独立风暴状态机、阀后接力等待非阻塞化）。
+- 测试：单测七套 49 断言 + E2E 20 断言全绿；两安装点 5 文件 SHA256 复验 SAME。
+
 ## 0.3.5（2026-09-03）
 
 三项实战驱动改进：

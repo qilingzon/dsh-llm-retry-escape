@@ -30,6 +30,7 @@ window.__ModuleLoader__.load({
       "retry-resolved": "✅ 重试成功·已解决",
       "relay-rearmed": "🔁 阀后自动接力",
       "strategy-injected": "📜 连败策略注入",
+      "strategy-escalated": "📜 升级·拆任务",
       "config-disease": "⚙️ 配置病诊断",
       "unparsable": "无法解析的记录"
     };
@@ -48,6 +49,7 @@ window.__ModuleLoader__.load({
       "retry-resolved": "#22c55e",
       "relay-rearmed": "#06b6d4",
       "strategy-injected": "#8b5cf6",
+      "strategy-escalated": "#d946ef",
       "config-disease": "#f97316",
       "unparsable": "#9ca3af"
     };
@@ -95,6 +97,23 @@ window.__ModuleLoader__.load({
 
       var records = Array.isArray(data.records) ? data.records : [];
 
+      // v0.3.6 ④：统计卡——按现象聚合当前加载的记录，色点计数条（未知现象也兜底显示）
+      var PHEN_ORDER = ["retry-detected", "retry-resolved", "strategy-injected", "strategy-escalated", "config-disease", "deadloop", "pseudoprogress", "pseudoprogress-resolved", "regression", "regression-resolved", "relay-timeout", "relay-livelock", "relay-zeroprogress", "relay-regression", "relay-rearmed", "test"];
+      var stats = {};
+      records.forEach(function (r) { var k = String(r.phenomenon || "unparsable"); stats[k] = (stats[k] || 0) + 1; });
+      var statKeys = PHEN_ORDER.filter(function (k) { return stats[k]; }).concat(
+        Object.keys(stats).filter(function (k) { return PHEN_ORDER.indexOf(k) === -1; }).sort()
+      );
+      var statsStrip = records.length === 0 ? null : react.createElement("div",
+        { style: { display: "flex", gap: "6px", flexWrap: "wrap", marginBottom: "8px" } },
+        statKeys.map(function (k) {
+          var color = PHEN_COLOR[k] || "#9ca3af";
+          return react.createElement("span", { key: k,
+            style: { fontSize: "11px", padding: "2px 8px", borderRadius: "10px", border: "1px solid " + color + "66", color: color, whiteSpace: "nowrap", background: color + "14" } },
+            (PHEN_LABEL[k] || k) + " × " + stats[k]);
+        })
+      );
+
       var headline = react.createElement("div", { style: { marginBottom: "8px", display: "flex", alignItems: "baseline", gap: "10px", flexWrap: "wrap" } },
         react.createElement("span", { style: { fontWeight: 600 } }, "五种病理监测历史"),
         react.createElement("span", { style: { fontSize: "11px", color: "var(--dsw-alias-label-secondary, #888)" } },
@@ -126,6 +145,7 @@ window.__ModuleLoader__.load({
 
       return react.createElement("div", { style: { padding: "8px 2px" } },
         headline,
+        statsStrip,
         records.length === 0
           ? react.createElement("div", { style: { color: "var(--dsw-alias-label-secondary, #888)", fontSize: "12px", padding: "12px 0" } },
               errorText ? "无法读取洞察账本（/api/dsh-llm-retry-escape/insights）" : "暂无记录——五种病理（死循环/活锁/伪进度/负进度/静默腐蚀）被监测到后会出现在这里。")

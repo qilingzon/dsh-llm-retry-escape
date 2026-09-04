@@ -53,6 +53,11 @@
  * 重试与接力只是重发同样的巨型生成（armor-lab 实证 4.5h 40+ 败 0 文件落盘）——只有让
  * 每次尝试的生成时长降到中继杀手窗口以下，风暴才会真正消失。现象记 strategy-injected。
  * 注入时机为下一轮入口：agent-loop 步内重试间无任何可注入钩子（步内插消息会破坏会话不变式）。
+ *
+ * v0.3.6：A1-Coach 升级阶梯——策略注入不再原地重复：注入后风暴仍在（下一轮入口仍有待注入
+ * 记录）→ 阶梯+1，第 2 级起改发「拆任务」升级话术（拆小步/缩减版骨架/blocked 换路径，
+ * 现象 strategy-escalated）；风暴痊愈（某轮入口无待注入记录）→ 阶梯复位。
+ * DSH_RETRY_STRATEGY_MAX_LEVEL：默认 2；1=永不升级；0=关闭整个策略注入。
  */
 
 import { randomUUID } from "node:crypto";
@@ -82,6 +87,14 @@ const READ_ONLY_TOOL_RE = /read|glob|grep|search|fetch|todo|view|open|list|web|a
 // v0.3.4：同一 (turn, step) 连败多少次后，下一轮注入「改变生成形状」策略（0 = 关闭）
 const STRATEGY_AFTER = (() => {
 	const raw = process.env.DSH_RETRY_STRATEGY_AFTER;
+	if (raw === void 0 || raw === "") return 2;
+	const n = Number(raw);
+	return Number.isFinite(n) && n >= 0 ? Math.floor(n) : 2;
+})();
+
+// v0.3.6：策略注入升级阶梯上限——2=第二次注入起升级「拆任务」（默认）；1=永不升级；0=关闭整个策略注入
+const STRATEGY_MAX_LEVEL = (() => {
+	const raw = process.env.DSH_RETRY_STRATEGY_MAX_LEVEL;
 	if (raw === void 0 || raw === "") return 2;
 	const n = Number(raw);
 	return Number.isFinite(n) && n >= 0 ? Math.floor(n) : 2;
@@ -360,6 +373,19 @@ function strategyWarnText(count, codes, turn, step) {
 	);
 }
 
+// v0.3.6：升级话术——L1 形状策略注入后风暴未止（连败到阀止损），同一 agent 第 2 次注入起改发：
+// 按当前粒度已证明不可救，必须先拆任务再干活（拆小步/缩减版骨架/换路径）
+function strategyEscalateText(count, codes, turn, step) {
+	const c = codes.join("/");
+	return (
+		`[retry-strategy·升级] turn${turn}/step${step} 已在生成形状策略注入后仍连败 ${count} 次（${c}）并触发阀止损——这一步按当前粒度已证明不可救药，禁止再原样重发。本轮先拆任务再干活：` +
+		"1) 立即把该步拆成 ≥3 个可独立验证的小步，写进 progress.md 或任务清单（每小步产物 = 一个文件或一段落）；" +
+		"2) 本轮只执行第一个小步，落盘+回读验证后即停，其余小步留给后续轮次；" +
+		"3) 若该步的成品必然巨大，先交付可运行的缩减版骨架，完整版分多轮补齐；" +
+		"4) 若拆小后仍连败，把该步标记 blocked 并换实现路径（换工具/换文件切分/换方案），不要硬冲。"
+	);
+}
+
 export const name = "dsh-llm-retry-escape";
 export const inject = ["agents", "webServer", "goals"];
 
@@ -372,6 +398,7 @@ export function apply(ctx) {
 	const active = /* @__PURE__ */ new Set();
 	const valveRelayPending = /* @__PURE__ */ new Set(); // v0.3.3：阀收尾后待重新武装 goal 的 agentId
 	const strategyPending = /* @__PURE__ */ new Map(); // v0.3.4：agentId -> {turn, step, count, codes[]} 待注入策略
+	const strategyLadder = /* @__PURE__ */ new Map(); // v0.3.6：agentId -> {level, injectedTurn} 策略升级阶梯
 	function track(operation) {
 		const tracked = operation.finally(() => active.delete(tracked));
 		active.add(tracked);
@@ -569,6 +596,7 @@ export function apply(ctx) {
 		let injectText = null;
 		let injectStreak = 0;
 		let strategyText = null;
+		let strategyTag = "连败策略注入";
 		try {
 			if (agent?.session?.header?.origin === "subagent") return await next();
 			const sid = agent.session.header.id;
@@ -582,21 +610,34 @@ export function apply(ctx) {
 			logRetryResolutions(agent, st.resolvedLogged);   // C(v0.3.2)：解决即记账（此前带失败史且已完成的步骤记 retry-resolved）
 			// A1-Coach(v0.3.4)：消费策略注入待办——上一轮的连败步，本轮入口给出生成形状指令
 			const sp = strategyPending.get(agent.id);
-			if (sp && sp.count >= STRATEGY_AFTER) {
+			if (sp && sp.count >= STRATEGY_AFTER && STRATEGY_MAX_LEVEL > 0) {
 				strategyPending.delete(agent.id);
-				strategyText = strategyWarnText(sp.count, sp.codes, sp.turn, sp.step);
+				// v0.3.6：阶梯键=agentId（turn 每轮递增，按 (turn,step) 匹配永不上浮）；有历史注入且风暴仍在 → +1
+				const prevLv = strategyLadder.get(agent.id);
+				const level = prevLv ? Math.min(prevLv.level + 1, STRATEGY_MAX_LEVEL) : 1;
+				strategyLadder.set(agent.id, { level, injectedTurn: typeof turn === "number" ? turn : -1 });
+				const escalated = level >= 2;
+				strategyText = escalated
+					? strategyEscalateText(sp.count, sp.codes, sp.turn, sp.step)
+					: strategyWarnText(sp.count, sp.codes, sp.turn, sp.step);
+				strategyTag = escalated ? `连败策略升级(L${level})` : "连败策略注入";
 				appendInsight({
 					source: "plugin",
 					session: sid,
 					workspace: agent.session?.header?.cwd || "",
-					phenomenon: "strategy-injected",
-					detail: `turn${sp.turn}/step${sp.step} 连败 ${sp.count} 次（${sp.codes.join("/")}）——已注入生成形状策略（小块输出/分块落盘）`,
-					resolved: "已注入策略",
-					lesson: "换新请求必须换生成形状——小块输出绕开中继杀手窗口",
+					phenomenon: escalated ? "strategy-escalated" : "strategy-injected",
+					detail: escalated
+						? `turn${sp.turn}/step${sp.step} 形状策略注入后仍连败 ${sp.count} 次（${sp.codes.join("/")}）——已升级「拆任务」指令（阶梯 L${level}）`
+						: `turn${sp.turn}/step${sp.step} 连败 ${sp.count} 次（${sp.codes.join("/")}）——已注入生成形状策略（小块输出/分块落盘）`,
+					resolved: escalated ? `已注入升级策略(L${level})` : "已注入策略",
+					lesson: escalated ? "同一粒度反复失败=粒度病——先拆小再干活，或换实现路径" : "换新请求必须换生成形状——小块输出绕开中继杀手窗口",
 				});
 			} else if (sp) {
 				strategyPending.delete(agent.id);   // 未达阈值的风暴记录：静默消费，不注入
 			}
+			// v0.3.6：风暴痊愈复位——本轮入口无待注入记录且已过注入轮 → 阶梯清零
+			const ladNow = strategyLadder.get(agent.id);
+			if (ladNow && !sp && typeof turn === "number" && turn > ladNow.injectedTurn) strategyLadder.delete(agent.id);
 			if (typeof turn === "number" && turn !== st.lastTurn) {
 				if (st.pendingCheckWarn) {
 					// 校验门警告优先于 streak 警告（负进度比伪进度更毒）
@@ -631,7 +672,7 @@ export function apply(ctx) {
 				extras.push(progressNotice(injectText, tag));
 			}
 			if (strategyText && decision?.kind === "enter") {
-				extras.push(progressNotice(strategyText, "连败策略注入", "retry-strategy"));
+				extras.push(progressNotice(strategyText, strategyTag, "retry-strategy"));
 			}
 			if (extras.length > 0 && decision && decision.kind === "enter" && Array.isArray(decision.messages)) {
 				return { ...decision, messages: [...decision.messages, ...extras] };
