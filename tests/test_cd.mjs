@@ -55,7 +55,8 @@ const onToolExecute = listeners["tools/post-execute"][0];
 const enterNext = async () => ({ kind: "enter", messages: [] });
 async function workTurn(agent, turn) {
   await onPreStep({ agent, turn }, enterNext);
-  await onToolExecute({ agent }, null, async () => "ok");
+  // v0.3.11：哨兵只认写意图工具
+  await onToolExecute({ agent, name: "write", arguments: { path: "artifact.txt" } }, null, async () => "ok");
 }
 
 // ── 账本直读辅助（动态路径：env.DSH_HOME 即临时账本）──

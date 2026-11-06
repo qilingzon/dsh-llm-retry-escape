@@ -51,7 +51,7 @@ await okA("2 consecutive fails -> strategy injected at next pre-step", async () 
 	const text = d.messages[0].content[0].text;
 	assert.ok(text.includes("连续失败 2 次"), "names fail count");
 	assert.ok(text.includes("TRANSPORT/TIMEOUT"), "names failure codes");
-	assert.ok(text.includes("1500") && text.includes("追加") && text.includes("骨架"), "contains shape instructions");
+	assert.ok(text.includes("4000") && text.includes("追加") && text.includes("骨架"), "contains shape instructions");
 	// 账本
 	const lines = (await fsp.readFile(join(tempHome, "retry-insights.jsonl"), "utf8")).split("\n").filter(Boolean);
 	const rec = lines.map((l) => JSON.parse(l)).find((r) => r.phenomenon === "strategy-injected");
@@ -134,7 +134,7 @@ await okA("strategy coexists with progress-warning in same pre-step", async () =
 	// turn1：先干活（伪进度条件），再连败 2 次（策略条件），零落盘收轮
 	const onTool = listeners["tools/post-execute"][0];
 	await preStep(listeners)({ agent, turn: 1 }, enterNext);
-	await onTool({ agent }, null, async () => "ok");
+	await onTool({ agent, name: "write", arguments: { path: "artifact.txt" } }, null, async () => "ok");
 	await failOnce(ctx, listeners, agent, 1, 1);
 	await failOnce(ctx, listeners, agent, 1, 1);
 	await listeners["agent/turn-stopping"][0]({ agent });

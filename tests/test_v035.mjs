@@ -102,7 +102,7 @@ await okA("adaptive strategy: TRANSPORT/TIMEOUT -> shape advice (unchanged)", as
 	await failOnce(ctx, listeners, agent, 1, 1, "TIMEOUT", "pi-ai stream idle timeout after 120000ms");
 	const d = await listeners["agent/pre-step"][0]({ agent, turn: 2 }, enterNext);
 	const text = d.messages[0].content[0].text;
-	assert.ok(text.includes("1500") && text.includes("追加"), "shape advice for stream kills");
+	assert.ok(text.includes("4000") && text.includes("追加"), "shape advice for stream kills");
 });
 
 // ── ③ 哨兵写入类过滤 ──

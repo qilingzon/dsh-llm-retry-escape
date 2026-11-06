@@ -55,10 +55,10 @@ const onTurnStopping = listeners["agent/turn-stopping"]?.[0];
 const onToolExecute = listeners["tools/post-execute"]?.[0];
 
 const enterNext = async () => ({ kind: "enter", messages: [] });
-// 一个"在干活"的轮：pre-step + 一次工具调用（v0.3.x 语义：没有它不算伪进度嫌疑）
+// 一个"在干活"的轮：pre-step + 一次写意图工具调用（v0.3.11：只认写意图工具）
 async function workTurn(agent, turn) {
   await onPreStep({ agent, turn }, enterNext);
-  await onToolExecute({ agent }, null, async () => "ok");
+  await onToolExecute({ agent, name: "write", arguments: { path: join(watchDir, "x.txt") } }, null, async () => "ok");
 }
 
 ok("exports", () => {

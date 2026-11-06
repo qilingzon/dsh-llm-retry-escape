@@ -13,7 +13,8 @@ const ROOTS = (process.env.DSH_MONITOR_ROOTS || process.argv[2] ||
   [HOME + "/--D-deepseek-armor-lab--", HOME + "/--D-deepseek-web1--"].join(","))
   .split(",").map((s) => s.trim()).filter(Boolean);
 const LEDGER = "C:/Users/qiling/.dsh/retry-insights.jsonl";
-const LOG = path.join(__dirname, "monitor-multi-" + new Date().toISOString().slice(0, 10).replace(/-/g, "") + ".log");
+const LOG_DIR = process.env.DSH_MONITOR_LOG_DIR || __dirname;
+const LOG = path.join(LOG_DIR, "monitor-multi-" + new Date().toISOString().slice(0, 10).replace(/-/g, "") + ".log");
 const POLL_MS = Number(process.env.DSH_MONITOR_POLL_MS) || 20000;
 const MAX_MIN = Number(process.env.DSH_MONITOR_MAX_MIN) || 240;
 const STATE_FILE = process.argv[3] || path.join(__dirname, "monitor-multi.state.json");
@@ -23,6 +24,16 @@ const TAG = (root) => path.basename(root).replace(/^--D-deepseek-/, "").replace(
 const wait = (ms) => Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms);
 
 function log(line) { try { fs.appendFileSync(LOG, "[" + fmt(Date.now()) + "] " + line + "\n"); } catch { /* 日志失败永不影响监视 */ } }
+
+// v0.3.7：日志保留 7 天——启动时清理自身过期的 monitor-multi-*.log（清理失败不影响监视）
+try {
+  const keepMs = 7 * 24 * 3600 * 1000;
+  for (const f of fs.readdirSync(LOG_DIR)) {
+    if (!/^monitor-multi-\d{8}\.log$/.test(f)) continue;
+    const p = path.join(LOG_DIR, f);
+    if (Date.now() - fs.statSync(p).mtimeMs > keepMs) { try { fs.unlinkSync(p); } catch {} }
+  }
+} catch { }
 function newestSession(root) {
   const dirs = fs.readdirSync(root).filter((d) => d.startsWith("session-"));
   let best = null;

@@ -1,5 +1,33 @@
 # 更新日志 — dsh-llm-retry-escape
 
+## 0.3.11（2026-11-07）
+
+**体检定点修复：误报 / 质量 / 效率 / token 成本**（依据：账本 3865 条 + 实测数据）
+
+1. 哨兵只认**写意图**（写工具白名单 + shell 写命令）；只读命令、2>&1 不再算"干活"，空工作区与纯调查轮不再误判伪进度。
+2. 指纹超 2 万上限被截断 → 关闭该会话伪进度判定（pseudoprogress-unreliable）。
+3. 指纹**只读轮不扫 + 64 并发 stat**（armor-lab 74k 文件：实测 3622ms/次 → 亚秒级）。
+4. 风暴已解决（同 (turn,step) 有 step/end）→ 不再注入改形状指令（strategy-skipped-resolved）。
+5. always 模式致命码（AUTH/INVALID_REQUEST/超长等）不重试（etry-skipped-fatal）。
+6. 风暴总时长闸 180s（DSH_RETRY_STORM_MAX_MS，storm-timeout），不再等满 5×120s。
+7. provider 冷却：10 分钟 2 次阀 → 60s 起指数退避（上限 5 分钟），冷却期失败 1 次即止损、接力延后（provider-cooldown）。
+8. 注入预算 3 条/类 + 同文本 5 轮去重（injection-suppressed）+ 前缀「〔自动提示·非用户指令〕」。
+9. 话术：工具参数 1500→4000 字符、<3000 字符单文件允许一次写完、删除绝对化措辞。
+10. 宿主默认策略改结构判定（DSH 改默认值不再静默失效）。
+新增 	ests/test_v0311.mjs（10 条）；全量 10 套 78 断言 + escape0 + relay E2E 全绿。
+
+## 0.3.10（2026-09）
+
+**拦截并升级 DSH 原生默认注入策略**：宿主在 provider 未配 retryPolicy 时注入 {mode:"normal", maxRetries:5,
+codes:[EMPTY_RESPONSE,RATE_LIMIT,SERVER,TIMEOUT,TRANSPORT]} 而非 undefined，导致 0.3.9 兜底不触发、
+PI_AI_ERROR 第 1 次即击穿、TRANSPORT 5 次耗尽暴毙。改为 isDshDefaultPolicy 命中即升级
+UNIVERSAL_DEFAULT_POLICY（always + 逃生阀 + 接力），normal 模式纳入 PI_AI_ERROR 可重试。
+
+## 0.3.9（2026-09）
+
+**通用重试兜底**：provider 未配 retryPolicy 时旧逻辑直接放行给宿主（无重试）→ GUI「本轮运行失败
+PI_AI_ERROR」。新增 UNIVERSAL_DEFAULT_POLICY（always / 1s 起退避 / 30s 上限 / 抖动 0.2）零配置覆盖
+所有 provider；DSH_RETRY_FALLBACK_MODE 可关。
 ## 0.3.7（2026-09-04）
 
 **账本治理三件套**（动机：账本两天 754 条 / 263KB，81% 为 retry-detected/resolved 高频条目，无界增长先痛面板 5s 全量轮询）：

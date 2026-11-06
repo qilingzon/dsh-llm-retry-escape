@@ -32,6 +32,12 @@ window.__ModuleLoader__.load({
       "strategy-injected": "📜 连败策略注入",
       "strategy-escalated": "📜 升级·拆任务",
       "config-disease": "⚙️ 配置病诊断",
+      "strategy-skipped-resolved": "⚪ 风暴已解决·未注入",
+      "retry-skipped-fatal": "⛔ 致命码·不重试",
+      "storm-timeout": "🌪 风暴超时止损",
+      "provider-cooldown": "🧊 provider 冷却",
+      "injection-suppressed": "🔇 注入被预算抑制",
+      "pseudoprogress-unreliable": "❔ 指纹不可信·已降级",
       "unparsable": "无法解析的记录"
     };
     var PHEN_COLOR = {
@@ -51,6 +57,12 @@ window.__ModuleLoader__.load({
       "strategy-injected": "#8b5cf6",
       "strategy-escalated": "#d946ef",
       "config-disease": "#f97316",
+      "strategy-skipped-resolved": "#9ca3af",
+      "retry-skipped-fatal": "#ef4444",
+      "storm-timeout": "#f97316",
+      "provider-cooldown": "#06b6d4",
+      "injection-suppressed": "#9ca3af",
+      "pseudoprogress-unreliable": "#9ca3af",
       "unparsable": "#9ca3af"
     };
 
@@ -98,7 +110,7 @@ window.__ModuleLoader__.load({
       var records = Array.isArray(data.records) ? data.records : [];
 
       // v0.3.6 ④：统计卡——按现象聚合当前加载的记录，色点计数条（未知现象也兜底显示）
-      var PHEN_ORDER = ["retry-detected", "retry-resolved", "strategy-injected", "strategy-escalated", "config-disease", "deadloop", "pseudoprogress", "pseudoprogress-resolved", "regression", "regression-resolved", "relay-timeout", "relay-livelock", "relay-zeroprogress", "relay-regression", "relay-rearmed", "test"];
+      var PHEN_ORDER = ["retry-detected", "retry-resolved", "strategy-injected", "strategy-escalated", "config-disease", "deadloop", "pseudoprogress", "pseudoprogress-resolved", "regression", "regression-resolved", "relay-timeout", "relay-livelock", "relay-zeroprogress", "relay-regression", "relay-rearmed", "strategy-skipped-resolved", "retry-skipped-fatal", "storm-timeout", "provider-cooldown", "injection-suppressed", "pseudoprogress-unreliable", "test"];
       var stats = {};
       records.forEach(function (r) { var k = String(r.phenomenon || "unparsable"); stats[k] = (stats[k] || 0) + 1; });
       var statKeys = PHEN_ORDER.filter(function (k) { return stats[k]; }).concat(

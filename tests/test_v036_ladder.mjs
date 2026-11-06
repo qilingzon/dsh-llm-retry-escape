@@ -13,7 +13,7 @@ process.env.DSH_RETRY_ESCAPE_AFTER = "30";
 process.env.DSH_RETRY_STRATEGY_AFTER = "2";
 process.env.DSH_PROGRESS_WATCH_DIR = await fsp.mkdtemp(join(tmpdir(), "rl-ladder-watch-"));
 
-const pluginUrl = new URL("../dsh-llm-retry-escape/index.js", import.meta.url).href;
+const pluginUrl = new URL("../index.js", import.meta.url).href;
 const plugin = await import(pluginUrl);
 
 let pass = 0, fail = 0; const fails = [];

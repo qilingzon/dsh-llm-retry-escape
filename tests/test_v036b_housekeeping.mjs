@@ -12,7 +12,7 @@ process.env.DSH_HOME = tempHome;
 process.env.DSH_PROGRESS_WATCH_DIR = await fsp.mkdtemp(join(tmpdir(), "rl-house-watch-"));
 delete process.env.DSH_RETRY_LEDGER_MAX_BYTES;
 
-const plugin = await import(new URL("../dsh-llm-retry-escape/index.js", import.meta.url).href);
+const plugin = await import(new URL("../index.js", import.meta.url).href);
 
 let pass = 0, fail = 0; const fails = [];
 async function okA(name, fn) { try { await fn(); pass++; console.log("PASS " + name); } catch (e) { fail++; fails.push(name); console.log("FAIL " + name + " -> " + e.message); } }
@@ -80,7 +80,7 @@ await okA("monitor log retention deletes >7d logs at startup (subprocess)", asyn
   writeFileSync(old, "old log\n");
   const oldTime = new Date(Date.now() - 8 * 24 * 3600 * 1000);
   utimesSync(old, oldTime, oldTime);
-  const monPath = fileURLToPath(new URL("../out/monitor-multi.cjs", import.meta.url));
+  const monPath = fileURLToPath(new URL("../ops/monitor-multi.cjs", import.meta.url));
   await promisify(execFile)(process.execPath, [monPath, roots, state], {
     env: { ...process.env, DSH_MONITOR_LOG_DIR: logDir, DSH_MONITOR_ROOTS: roots, DSH_MONITOR_MAX_MIN: "0.03", DSH_MONITOR_POLL_MS: "1000" },
     timeout: 60000,
